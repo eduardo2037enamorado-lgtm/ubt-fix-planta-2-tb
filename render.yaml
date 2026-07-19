@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ubt-fix-planta-2-tb
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ACCESS_CODE
+        value: "1010"
+      - key: PLANT_NAME
+        value: "Planta 2 TB"
+      - key: PYTHON_VERSION
+        value: "3.12.0"

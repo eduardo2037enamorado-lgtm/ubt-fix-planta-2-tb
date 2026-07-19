@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UBT Fix Planta 2 TB - Etiquetas QR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">UBT Fix Planta 2 TB</p>
+          <h1>Etiquetas QR</h1>
+          <p class="subtitle">28 codigos QR - Funciona con datos moviles del celular</p>
+        </div>
+        <nav class="nav-links">
+          <a class="nav-link" href="{{ url_for('escanear') }}">Escanear</a>
+          <a class="nav-link" href="{{ url_for('historial') }}">Historial</a>
+          <a class="nav-link active" href="{{ url_for('codigos') }}">Etiquetas QR</a>
+        </nav>
+      </header>
+
+      <section class="card server-config">
+        <h2>Servidor en planta</h2>
+        <p class="scan-hint">
+          Los tecnicos abren esta direccion con <strong>datos moviles</strong> (sin WiFi):
+          <strong>{{ base_url }}</strong>
+        </p>
+        <form method="get" class="server-form">
+          <input type="url" name="servidor" value="{{ base_url }}" required />
+          <button type="submit" class="btn btn-secondary">Actualizar QR</button>
+        </form>
+      </section>
+
+      <div class="print-actions">
+        <a class="btn btn-primary" href="{{ url_for('codigos_pdf', servidor=base_url) }}">Descargar PDF</a>
+        <button type="button" class="btn btn-secondary" onclick="window.print()">Imprimir etiquetas</button>
+      </div>
+
+      <section class="barcode-grid">
+        {% for item in labels %}
+        <article class="barcode-card">
+          <h2>UBT {{ item.ubt }}</h2>
+          <img
+            src="{{ url_for('codigo_qr_imagen', ubt_code=item.ubt, servidor=base_url) }}"
+            alt="QR UBT {{ item.ubt }}"
+          />
+          <p class="barcode-code">{{ item.code }}</p>
+          <p class="barcode-url">{{ item.url }}</p>
+        </article>
+        {% endfor %}
+      </section>
+    </div>
+  </body>
+</html>

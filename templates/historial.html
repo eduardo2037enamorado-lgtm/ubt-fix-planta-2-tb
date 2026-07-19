@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Historial - UBT Fix Planta 2 TB</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Planta 2 TB</p>
+          <h1>Historial de reparaciones</h1>
+          <p class="subtitle">Todas las reparaciones registradas por los técnicos</p>
+        </div>
+        <nav class="nav-links">
+          <a class="nav-link" href="{{ url_for('escanear') }}">Escanear</a>
+          <a class="nav-link active" href="{{ url_for('historial') }}">Historial</a>
+          <a class="nav-link" href="{{ url_for('codigos') }}">Etiquetas QR</a>
+        </nav>
+      </header>
+
+      <section class="card app-locked" id="history-content">
+        <div class="filters-grid">
+          <label class="field">
+            <span>UBT</span>
+            <select id="filter-ubt">
+              <option value="">Todas</option>
+              {% for ubt in ubt_options %}
+              <option value="{{ ubt }}">UBT {{ ubt }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Técnico</span>
+            <select id="filter-tecnico">
+              <option value="">Todos</option>
+              {% for tecnico in tecnicos %}
+              <option value="{{ tecnico }}">{{ tecnico }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Máquina</span>
+            <select id="filter-maquina">
+              <option value="">Todas</option>
+              {% for maquina in maquinas %}
+              <option value="{{ maquina.id }}">{{ maquina.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Fecha</span>
+            <input type="date" id="filter-fecha" />
+          </label>
+        </div>
+
+        <div class="history-summary" id="history-summary"></div>
+        <div id="history-list" class="history-list"></div>
+      </section>
+    </div>
+
+    <div id="access-gate" class="access-gate hidden">
+      <div class="access-card">
+        <h2>Código de acceso</h2>
+        <p class="scan-hint">Ingresa el código para usar la aplicación.</p>
+        <form id="access-form" class="form">
+          <label class="field">
+            <span>Código</span>
+            <input type="password" id="access-code" autocomplete="off" required />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
+        </form>
+        <p id="access-message" class="form-message error hidden"></p>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='historial.js') }}"></script>
+  </body>
+</html>

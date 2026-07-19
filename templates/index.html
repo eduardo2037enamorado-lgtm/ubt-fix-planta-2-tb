@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UBT Fix Planta 2 TB</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Planta 2 TB</p>
+          <h1>UBT Fix Planta 2 TB</h1>
+          <p class="subtitle">Todas las UBT de Planta 2 TB</p>
+        </div>
+        <nav class="nav-links">
+          <a class="nav-link" href="{{ url_for('escanear') }}">Escanear</a>
+          <a class="nav-link" href="{{ url_for('historial') }}">Historial</a>
+          <a class="nav-link active" href="{{ url_for('registro') }}">Registro manual</a>
+          <a class="nav-link" href="{{ url_for('codigos') }}">Etiquetas QR</a>
+        </nav>
+        <div class="summary" id="summary"></div>
+      </header>
+
+      <main class="layout">
+        <section class="card">
+          <h2>Nueva reparación</h2>
+          <form id="repair-form" class="form">
+            <div class="field-row">
+              <label class="field">
+                <span>UBT</span>
+                <select name="ubt" required>
+                  <option value="">Seleccionar...</option>
+                  {% for ubt in ubt_options %}
+                  <option value="{{ ubt }}">UBT {{ ubt }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Fecha</span>
+                <input type="date" name="fecha" required />
+              </label>
+
+              <label class="field">
+                <span>Técnico</span>
+                <select name="tecnico" required>
+                  <option value="">Seleccionar técnico...</option>
+                  {% for tecnico in tecnicos %}
+                  <option value="{{ tecnico }}">{{ tecnico }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+
+            <div class="field-row field-row-2">
+              <label class="field">
+                <span>Tiempo estimado (horas)</span>
+                <input type="number" name="horas" min="0" value="0" required />
+              </label>
+              <label class="field">
+                <span>Tiempo estimado (minutos)</span>
+                <input type="number" name="minutos" min="0" max="59" value="30" required />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Máquina reparada</span>
+              <select name="maquina" required>
+                <option value="">Seleccionar máquina...</option>
+                {% for maquina in maquinas %}
+                <option value="{{ maquina.id }}">{{ maquina.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Descripción de la reparación</span>
+              <textarea
+                name="descripcion"
+                rows="4"
+                placeholder="Describe el trabajo realizado en la prueba eléctrica..."
+                required
+              ></textarea>
+            </label>
+
+            <div class="parts-block">
+              <div class="parts-header">
+                <h3>Repuestos / materiales</h3>
+                <button type="button" class="btn btn-secondary" id="add-part">+ Agregar repuesto</button>
+              </div>
+              <div id="parts-list" class="parts-list"></div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Guardar reparación</button>
+            </div>
+            <p id="form-message" class="form-message" hidden></p>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="list-header">
+            <h2>Historial</h2>
+            <label class="field field-inline">
+              <span>Filtrar por UBT</span>
+              <select id="filter-ubt">
+                <option value="">Todas</option>
+                {% for ubt in ubt_options %}
+                <option value="{{ ubt }}">UBT {{ ubt }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <div id="repairs-list" class="repairs-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="part-row-template">
+      <div class="part-row">
+        <input type="text" name="part-name" placeholder="Nombre del repuesto" />
+        <input type="number" name="part-qty" min="1" value="1" />
+        <button type="button" class="btn btn-icon" title="Quitar">×</button>
+      </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
