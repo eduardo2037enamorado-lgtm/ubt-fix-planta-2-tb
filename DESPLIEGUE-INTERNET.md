@@ -39,9 +39,31 @@ En unos minutos tendras una URL como:
 | Tecnico | Seleccionar de la lista |
 | Conexion | Datos moviles del celular |
 
+## Almacenamiento permanente
+
+En Render, el disco del servidor web es **temporal**: si solo usas SQLite, las reparaciones se pierden al reiniciar.
+
+La app ahora usa **PostgreSQL** cuando existe la variable `DATABASE_URL`. El archivo `render.yaml` crea una base de datos en Render y la conecta automaticamente.
+
+### Opcion A: Base de datos en Render (incluida en render.yaml)
+1. En Render, abre tu servicio y verifica que exista la base `ubt-fix-db`
+2. Si desplegaste antes sin base de datos, agrega una **PostgreSQL** en Render y copia su **Internal Database URL** a la variable `DATABASE_URL` del servicio web
+3. Vuelve a desplegar
+
+La base gratuita de Render dura 30 dias. Para guardar datos sin limite de tiempo, usa la opcion B o paga el plan de base de datos (~$6/mes).
+
+### Opcion B: Neon (gratis y permanente, recomendado)
+1. Crea cuenta en https://neon.tech
+2. Crea un proyecto y copia la **Connection string**
+3. En Render → tu servicio → **Environment** → agrega:
+   - `DATABASE_URL` = la connection string de Neon
+4. Guarda y espera el redespliegue
+
+Las reparaciones quedan guardadas aunque el servidor web se reinicie.
+
 ## Nota sobre plan gratis de Render
 - La app puede tardar unos segundos al abrir si no se uso recientemente
-- Los datos se guardan en la nube mientras el servicio este activo
+- Las reparaciones se guardan en PostgreSQL de forma permanente (no en el disco del servidor)
 
 ## Si prefieres no usar la nube
 Necesitas una PC en planta con **internet por cable** y un tunel como **ngrok** o **Cloudflare Tunnel** para exponer la app a internet. Es mas tecnico; la nube es mas simple sin WiFi.

@@ -1,4 +1,3 @@
-import json
 from datetime import date
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
@@ -15,7 +14,16 @@ from barcodes import (
 from ubt_units import UBT_UNITS, is_valid_ubt, normalize_ubt
 from maquinas import MAQUINAS, MAQUINA_OPTIONS, maquina_label
 from tecnicos import TECNICOS
-from database import get_connection, init_db
+from database import (
+    fetch_reparaciones,
+    fetch_resumen_counts,
+    fetch_resumen_hoy_counts,
+    fetch_tiempo_total_hoy,
+    init_db,
+    insert_reparacion,
+    parse_repuestos,
+    USE_POSTGRES,
+)
 from network import get_lan_ip
 from pdf_codigos import generate_codigos_pdf
 
@@ -62,7 +70,7 @@ def get_base_url():
 
 @app.get("/health")
 def health():
-    return jsonify({"status": "ok", "plant": PLANT_NAME})
+    return jsonify({"status": "ok", "plant": PLANT_NAME, "database": "postgresql" if USE_POSTGRES else "sqlite"})
 
 
 @app.before_request
@@ -81,48 +89,12 @@ def serialize_reparacion(row):
         "maquina_label": maquina_label(row["maquina"]),
         "tiempo_estimado_minutos": row["tiempo_estimado_minutos"],
         "created_at": row["created_at"],
-        "repuestos": json.loads(row["repuestos"]),
+        "repuestos": parse_repuestos(row["repuestos"]),
     }
 
 
-def fetch_reparaciones(ubt=None, fecha=None, tecnico=None, maquina=None):
-    query = """
-        SELECT
-            r.id,
-            r.ubt,
-            r.fecha,
-            r.descripcion,
-            r.tecnico,
-            r.maquina,
-            r.tiempo_estimado_minutos,
-            r.created_at,
-            COALESCE(
-                json_group_array(
-                    json_object('nombre', p.nombre, 'cantidad', p.cantidad)
-                ) FILTER (WHERE p.id IS NOT NULL),
-                '[]'
-            ) AS repuestos
-        FROM reparaciones r
-        LEFT JOIN repuestos p ON p.reparacion_id = r.id
-        WHERE 1 = 1
-    """
-    params = []
-    if ubt is not None:
-        query += " AND r.ubt = ?"
-        params.append(ubt)
-    if fecha:
-        query += " AND r.fecha = ?"
-        params.append(fecha)
-    if tecnico:
-        query += " AND r.tecnico = ?"
-        params.append(tecnico)
-    if maquina:
-        query += " AND r.maquina = ?"
-        params.append(maquina)
-    query += " GROUP BY r.id ORDER BY r.created_at DESC, r.id DESC"
-
-    with get_connection() as conn:
-        rows = conn.execute(query, params).fetchall()
+def list_reparaciones_data(ubt=None, fecha=None, tecnico=None, maquina=None):
+    rows = fetch_reparaciones(ubt=ubt, fecha=fecha, tecnico=tecnico, maquina=maquina)
     return [serialize_reparacion(row) for row in rows]
 
 
@@ -283,7 +255,7 @@ def list_reparaciones():
     fecha = request.args.get("fecha", type=str) or None
     tecnico = request.args.get("tecnico", type=str) or None
     maquina = request.args.get("maquina", type=str) or None
-    repairs = fetch_reparaciones(ubt=ubt, fecha=fecha, tecnico=tecnico, maquina=maquina)
+    repairs = list_reparaciones_data(ubt=ubt, fecha=fecha, tecnico=tecnico, maquina=maquina)
     return jsonify({"total": len(repairs), "reparaciones": repairs})
 
 
@@ -293,7 +265,7 @@ def list_reparaciones_hoy():
     if not is_valid_ubt(ubt):
         ubt = None
     fecha = request.args.get("fecha", date.today().isoformat())
-    repairs = fetch_reparaciones(ubt=ubt, fecha=fecha)
+    repairs = list_reparaciones_data(ubt=ubt, fecha=fecha)
     return jsonify({"fecha": fecha, "total": len(repairs), "reparaciones": repairs})
 
 
@@ -304,62 +276,22 @@ def create_reparacion():
     if errors:
         return jsonify({"error": " ".join(errors)}), 400
 
-    with get_connection() as conn:
-        cursor = conn.execute(
-            """
-            INSERT INTO reparaciones (ubt, fecha, descripcion, tecnico, maquina, tiempo_estimado_minutos)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (ubt, fecha, descripcion, tecnico, maquina, tiempo_estimado_minutos),
-        )
-        reparacion_id = cursor.lastrowid
-        for repuesto in cleaned_repuestos:
-            conn.execute(
-                """
-                INSERT INTO repuestos (reparacion_id, nombre, cantidad)
-                VALUES (?, ?, ?)
-                """,
-                (reparacion_id, repuesto["nombre"], repuesto["cantidad"]),
-            )
-        row = conn.execute(
-            """
-            SELECT
-                r.id,
-                r.ubt,
-                r.fecha,
-                r.descripcion,
-                r.tecnico,
-                r.maquina,
-                r.tiempo_estimado_minutos,
-                r.created_at,
-                COALESCE(
-                    json_group_array(
-                        json_object('nombre', p.nombre, 'cantidad', p.cantidad)
-                    ) FILTER (WHERE p.id IS NOT NULL),
-                    '[]'
-                ) AS repuestos
-            FROM reparaciones r
-            LEFT JOIN repuestos p ON p.reparacion_id = r.id
-            WHERE r.id = ?
-            GROUP BY r.id
-            """,
-            (reparacion_id,),
-        ).fetchone()
+    row = insert_reparacion(
+        ubt,
+        fecha,
+        descripcion,
+        tecnico,
+        maquina,
+        tiempo_estimado_minutos,
+        cleaned_repuestos,
+    )
 
     return jsonify(serialize_reparacion(row)), 201
 
 
 @app.get("/api/resumen")
 def resumen():
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT ubt, COUNT(*) AS total
-            FROM reparaciones
-            GROUP BY ubt
-            ORDER BY ubt
-            """
-        ).fetchall()
+    rows = fetch_resumen_counts()
 
     counts = {unit: 0 for unit in UBT_UNITS}
     for row in rows:
@@ -373,37 +305,14 @@ def resumen_hoy():
     ubt = normalize_ubt(request.args.get("ubt", ""))
     if not is_valid_ubt(ubt):
         ubt = None
-    query = """
-        SELECT ubt, COUNT(*) AS total
-        FROM reparaciones
-        WHERE fecha = ?
-    """
-    params = [fecha]
-    if ubt is not None:
-        query += " AND ubt = ?"
-        params.append(ubt)
-    query += " GROUP BY ubt ORDER BY ubt"
 
-    with get_connection() as conn:
-        rows = conn.execute(query, params).fetchall()
+    rows = fetch_resumen_hoy_counts(fecha, ubt=ubt)
 
     counts = {unit: 0 for unit in UBT_UNITS}
     for row in rows:
         counts[row["ubt"]] = row["total"]
     total = sum(counts.values())
-
-    tiempo_query = """
-        SELECT COALESCE(SUM(tiempo_estimado_minutos), 0) AS tiempo_total
-        FROM reparaciones
-        WHERE fecha = ?
-    """
-    tiempo_params = [fecha]
-    if ubt is not None:
-        tiempo_query += " AND ubt = ?"
-        tiempo_params.append(ubt)
-
-    with get_connection() as conn:
-        tiempo_total = conn.execute(tiempo_query, tiempo_params).fetchone()["tiempo_total"]
+    tiempo_total = fetch_tiempo_total_hoy(fecha, ubt=ubt)
 
     return jsonify({
         "fecha": fecha,
